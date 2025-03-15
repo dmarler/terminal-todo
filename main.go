@@ -24,6 +24,7 @@ type appState int
 const (
 	visual appState = iota
 	adding
+	deleting
 )
 
 type model struct {
@@ -76,8 +77,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch m.state {
 		case adding:
 			return m.updateAdd(msg)
-    case visual:
-      return m.updateVisual(msg)
+		case visual:
+			return m.updateVisual(msg)
+		case deleting:
+			return m.updateDelete(msg)
 		}
 	}
 
@@ -94,8 +97,17 @@ func (m model) updateVisual(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case "a":
 			m.input.Focus()
-      m.state = adding
-			return m, cmd
+			m.state = adding
+		case "d":
+			m.state = deleting
+		case "k", "up":
+			if m.cursor > 0 {
+				m.cursor -= 1
+			}
+		case "j", "down":
+			if m.cursor <= len(*m.items)-1 {
+				m.cursor += 1
+			}
 		}
 	}
 
@@ -113,7 +125,7 @@ func (m model) updateAdd(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.input.SetValue("")
 			m.input.Blur()
 			m.fetchNotes()
-      m.state = visual
+			m.state = visual
 		case "escape":
 			m.input.SetValue("")
 			m.input.Blur()
@@ -125,25 +137,38 @@ func (m model) updateAdd(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) updateDelete(msg tea.Msg) (tea.Model, tea.Cmd) {
-  var cmd tea.Cmd
+	var cmd tea.Cmd
 
-  switch msg := msg.(type) {
-  case tea.KeyMsg:
-  switch msg.String() {
-    case "d":
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "d":
+			m.deleteNote((*m.items)[m.cursor].ID)
+			m.fetchNotes()
+			m.state = visual
+			return m, cmd
+		case "escape":
+			m.state = visual
+			return m, cmd
+		}
+		return m, cmd
+	}
 
-  }
-}
-
-  return m, cmd
+	return m, cmd
 }
 
 func (m model) View() string {
 	var b strings.Builder
 	b.WriteString("Terminal Todo\n\n")
 
-	for _, note := range *m.items {
-		b.WriteString(fmt.Sprintf("[] - %s\n", note.Note))
+	for i, note := range *m.items {
+		var cursorValue string
+		if m.cursor == i {
+			cursorValue = ">"
+		} else {
+			cursorValue = " "
+		}
+		b.WriteString(fmt.Sprintf("  %s [] - %s\n", cursorValue, note.Note))
 	}
 
 	b.WriteString(m.input.View())
@@ -172,10 +197,10 @@ func (m model) createNote(note string) {
 	}
 }
 
-func (m model) deleteNote(id int) {
-  if err := deleteNote(m.ctx, m.queries, id); err != nil {
-    panic(err)
-  }
+func (m model) deleteNote(id int64) {
+	if err := deleteNote(m.ctx, m.queries, id); err != nil {
+		panic(err)
+	}
 }
 
 func (m *model) fetchNotes() {
@@ -219,9 +244,9 @@ func updateNote(ctx context.Context, queries *nindex.Queries, id int, isComplete
 	return nil
 }
 
-func deleteNote(ctx context.Context, queries *nindex.Queries, id int) error {
-  if err := queries.DeleteNote(ctx, int64(id)); err != nil {
-    panic(err)
-  }
-  return nil
+func deleteNote(ctx context.Context, queries *nindex.Queries, id int64) error {
+	if err := queries.DeleteNote(ctx, int64(id)); err != nil {
+		panic(err)
+	}
+	return nil
 }
