@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"embed"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -18,6 +19,13 @@ import (
 
 //go:embed migrations/*.sql
 var embedMigrations embed.FS
+
+var (
+  notesLocation string
+  dataDir string
+  configDir string
+  stateDir string
+)
 
 type appState int
 
@@ -37,8 +45,11 @@ type model struct {
 }
 
 func main() {
+
+  err := loadConfig()
+
 	ctx := context.Background()
-	db, err := sql.Open("sqlite", "notes.sqlite")
+	db, err := sql.Open("sqlite", fmt.Sprintf("%s/notes.sqlite", dataDir))
 	if err != nil {
 		panic(err)
 	}
@@ -47,6 +58,8 @@ func main() {
 	if err := goose.SetDialect("sqlite3"); err != nil {
 		panic(err)
 	}
+
+  goose.SetLogger(goose.NopLogger())
 
 	if err := goose.Up(db, "migrations"); err != nil {
 		panic(err)
@@ -60,6 +73,36 @@ func main() {
 		os.Exit(1)
 	}
 
+}
+
+func loadConfig() error {
+  homeDir := os.Getenv("HOME")
+  dataDir = os.Getenv("XDG_DATA_HOME")
+  configDir = os.Getenv("XDG_CONFIG_HOME")
+  stateDir = os.Getenv("XDG_STATE_HOME")
+
+  if dataDir == "" {
+    dataDir = fmt.Sprintf("%s/.local/share", homeDir)
+  }
+  if configDir == "" {
+    configDir = fmt.Sprintf("%s/.config", homeDir)
+  }
+  if stateDir == "" {
+    stateDir = fmt.Sprintf("%s/.local/state", homeDir)
+  }
+
+  if dataDir == "" {
+    return errors.New("Error: Data directory not set. Please set an $XDG_DATA_HOME or $HOME environment variable.")
+  }
+  // Disabled for now since config and state directories aren't being used.
+  // if configDir == "" {
+  //   return errors.New("Error: Config directory not set. Please set an $XDG_CONFIG_HOME or $HOME enviornment variable.")
+  // }
+  // if stateDir == ""  {
+  //   return errors.New("Error: State directory not set. Please ste an $XDG_STATE_HOME or $HOME environment variable.")
+  // }
+
+  return nil
 }
 
 func (m model) Init() tea.Cmd {
