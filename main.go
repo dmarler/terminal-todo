@@ -148,7 +148,7 @@ func (m model) updateVisual(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor -= 1
 			}
 		case "j", "down":
-			if m.cursor <= len(*m.items)-1 {
+			if m.cursor < len(*m.items)-1 {
 				m.cursor += 1
 			}
 		}
