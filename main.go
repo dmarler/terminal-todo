@@ -67,7 +67,7 @@ func main() {
 
 	queries := nindex.New(db)
 
-	p := tea.NewProgram(initialModel(ctx, queries))
+	p := tea.NewProgram(initialModel(ctx, queries), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Println("There has been an error.")
 		os.Exit(1)
